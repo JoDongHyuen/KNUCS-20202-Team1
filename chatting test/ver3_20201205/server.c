@@ -9,7 +9,7 @@ void *thread_server_write(void*);
 
 int num_user=0; //참가자수
 int user_sock[8]; //최대 8명의 참가자
-char* user_name[8];//참가자들의 닉네임
+char user_name[8][BUFSIZ];//참가자들의 닉네임
 
 void *thread_server_write(void* nul) //thread function
 {
@@ -54,11 +54,12 @@ void server(int portnum)
 
 	while(1)
 	{
-		client_fd = accept(sock_id,NULL,NULL);
-		if(num_user < 8 && client_fd != -1)//유저채팅가입 처리(최대 8명)
-			add_usr(client_fd);
-
-		/*유저 이름 받아오기 및 인원수 제한처리 추가*/
+		if(num_user < 8)
+		{
+			client_fd = accept(sock_id,NULL,NULL);
+			if( client_fd != -1)//유저채팅가입 처리(최대 8명)
+				add_usr(client_fd);
+		}		
 
 		for(i=0; i<num_user; i++)
 		{				 
@@ -78,14 +79,13 @@ void server(int portnum)
 				{
 					if(i != j)
 					{
-						//write(user_sock[j],user_name[i],strlen(user_name[i]));
-						write(user_sock[j],"user",5);
+						write(user_sock[j],user_name[i],strlen(user_name[i]));
 						write(user_sock[j],">",2);
 						write(user_sock[j],chat,read_cnt);
 					}
 				}
 
-				printf("user>%s",chat);
+				printf("%s>%s",user_name[i],chat);
 			}		
 			
 		}
@@ -98,18 +98,17 @@ void server(int portnum)
 
 void add_usr(int s)
 {
-	//int read_cnt=0;
-	//char name[BUFSIZ];
+	int read_cnt=0;
+	char name[BUFSIZ];
 
 	//client_socket 저장, nonblocking 모드 전환
 	user_sock[num_user] = s;
-	
-	//printf("sibal\n");
-	////유저닉네임을 받음
-	//read_cnt = read(user_sock[num_user],name,sizeof(name));
-	//printf("%s,%d",name,read_cnt);
-	//name[read_cnt] = 0;
-	//strcpy(user_name[num_user],name);	
+
+	//유저닉네임을 받음
+	read_cnt = read(user_sock[num_user],name,sizeof(name));
+	name[read_cnt] = 0;
+	strcpy(user_name[num_user],name);	
+	printf("%s\n",user_name[num_user]);
 
 	//socket을 nonblocking모드로 전환
 	int flag = fcntl(s,F_GETFL,0);

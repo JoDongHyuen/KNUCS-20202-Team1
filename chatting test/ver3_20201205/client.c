@@ -27,19 +27,18 @@ void client(int portnum,char *ip)
 
 	void *pthread_client_rite(void*);	
 	pthread_t t1; //one thread
+	
+	//서버에게 닉네임을 보냄
+	printf("닉네임을 입력하십시오. : ");
+	scanf("%s",chat);
+	fflush(stdin);
 
 	sock_id = connect_to_server(ip, portnum);
-	if(sock_id == 0) exit(1);	
+	if(sock_id == 0) exit(1);
 
-	//printf("닉네임을 입력하십시오. : ");
-	//scanf("%s",chat);
-	//fflush(stdin);
-	
+	write(sock_id,chat,strlen(chat));
+
 	printf("\n\n******게임서버에 접속되었습니다.******\n\n");
-	
-	////서버에게 닉네임을 보냄
-	//write(sock_id,chat,strlen(chat));
-	//printf("%s,%ld",chat,strlen(chat));
 	
 	//nonblocking모드로 전환
 	int flag = fcntl(sock_id,F_GETFL,0);
