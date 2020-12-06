@@ -162,7 +162,6 @@ int main(int argc,char *argv[])
 		make_user_roles(user_roles, num_user);
 		/*유저의 직업을 알려주는 파트*/
 
-
 		/*낮이 되었습니다 파트*/
 
 		/*투표 파트*/

@@ -17,28 +17,28 @@ void print_now_users(int u_roles[], int users);
 
 
 int main() {
-	int users = 0;
+	int num_user = 0;
 	int *user_roles;					//유저의 역할. 1: 시민 2: 경찰 3: 의사 -1: 마피아
 	int numOfmap = 0, numOfciv = 0;		//마피아의 수와 시민의 수, 경찰과 의사를 시민으로 카운트한다. 
 	int who_kill = 0, who_save = 0;		//마피아가 죽이려는 유저와 의사가 살리려는 유저
-	while (users < 4) {					// 최소 유저 수는 4명이어야 됨.
+	while (num_user < 4) {					// 최소 유저 수는 4명이어야 됨.
 		printf("how many users : ");
-		scanf("%d", &users);
-		if (users < 4)
+		scanf("%d", &num_user);
+		if (num_user < 4)
 			printf("유저 수가 너무 적습니다.\n");
-		else if (users > 8) {
+		else if (num_user > 8) {
 			printf("유저 수가 너무 많습니다.\n");
-			users = 0;
+			num_user = 0;
 		}
 	}
 
-	MALLOC(user_roles, (users+1) * sizeof(int));		//정해진 유저 수에 따라 할당해줌
-	for (int i = 0; i <= users; i++) {					//유저 배열을 초기화
+	MALLOC(user_roles, num_user * sizeof(int));		//정해진 유저 수에 따라 할당해줌
+	for (int i = 0; i < num_user; i++) {					//유저 배열을 초기화
 		user_roles[i] = 0;
 	}
-	make_user_roles(user_roles, users);					//유저 수에 따라 역할 배분
+	make_user_roles(user_roles, num_user);					//유저 수에 따라 역할 배분
 
-	for (int i = 1; i <= users; i++) {					//유저 배분이 잘 됐나 테스트하는 코드
+	for (int i = 1; i <= num_user; i++) {					//유저 배분이 잘 됐나 테스트하는 코드
 		switch (user_roles[i]) {
 		case -1:
 			printf("player %d : 마피아\n", i);
@@ -61,9 +61,9 @@ int main() {
 	printf("현재 마피아 수: %d\n현재 시민 수: %d\n", numOfmap, numOfciv);	//마피아 수와 시민의 수가 잘 카운트 되는지 테스트하는 코드, 실제로는 삭제되어야 함.
 
 	//밤이 될 때 마다 실행되어야하는 경로
-	choice_invest(user_roles, users);					//경찰이 먼저 조사하고
-	who_kill = choice_kill(user_roles, users);			//마피아가 죽일사람 정하고
-	who_save = choice_save(user_roles, users);			//의사가 살릴사람 정함
+	choice_invest(user_roles, num_user);					//경찰이 먼저 조사하고
+	who_kill = choice_kill(user_roles, num_user);			//마피아가 죽일사람 정하고
+	who_save = choice_save(user_roles, num_user);			//의사가 살릴사람 정함
 	if (who_kill == who_save) {							//죽일사람을 살리면 살아나게하게 한다. 이미 죽은사람은 살릴 수 없음
 		printf("player가 의사에 의해 살아났습니다!");
 	}
@@ -79,7 +79,7 @@ int main() {
 
 void make_user_roles(int u_roles[], int users) {
 
-	int map = 1;//마피아와 경찰 의사는 기본 1명
+	int map = 1;							//마피아와 경찰 의사는 기본 1명
 	int pol = 1;
 	int doc = 1;
 	int civ;

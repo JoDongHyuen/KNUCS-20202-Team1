@@ -56,7 +56,7 @@ void make_user_roles(int num_user) {
 	}
 
 	civ = num_user - (map + pol + doc);	//시민은 남은 인원
-
+	num_mapia = map;//마피아의 수
 	srand((unsigned int)time(NULL));	//랜덤으로 분배
 
 	while (map_count < map) {	//마피아 먼저 정하기
@@ -65,7 +65,7 @@ void make_user_roles(int num_user) {
 			user_roles[temp] = -1;
 			mapia[map_count] = temp;
 			map_count++;
-			num_mapia++;//마피아의 수
+			
 		}
 		else continue;
 	}
