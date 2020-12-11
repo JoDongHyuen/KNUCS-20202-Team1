@@ -130,16 +130,19 @@ int choice_kill() {				//마피아가 밤에 행동하는 알고리즘
 		if (who_kill >= 0 && who_kill < num_user) {		//1~user수 사이의 수를 입력하지 않으면 다시 입력하게함.
 			if (!user_roles[who_kill]) {		//이미 죽은사람을 고르면 다시 고르게하기
 				for (i = 0; i < num_mapia; i++)
-				printf("이미 죽은 사람입니다. 다시 고르세요\n");
+					msg_to_client_spe("이미 죽은 사람입니다. 다시 고르세요\n", mapia[i]);
 				who_kill = -1;
 			}
 			else {
-				printf("%d번 플레이어를 죽입니다.\n", who_kill);	//맞게 고르면 출력하고
+				//맞게 고르면 출력하고
+				for (i = 0; i < num_mapia; i++)
+					msg_to_client_spe("플레이어를 죽입니다.\n", mapia[i]);
 				break;
 			}
 		}
 		else {
-			printf("잘못입력하였습니다.\n");
+			for (i = 0; i < num_mapia; i++)
+				msg_to_client_spe("잘못 고르셨습니다.\n", mapia[i]);
 			who_kill = -1;
 		}
 	}
@@ -150,32 +153,40 @@ int choice_kill() {				//마피아가 밤에 행동하는 알고리즘
 void choice_invest() {			//마피아 알고리즘과 흡사합니다.
 	
 	int who_invest = -1;
+	int read_pol = 0;
 	current_role = 2;
 	print_now_users(police);
-	//fflush(stdin);
+	
 	while (1) {
-		printf("조사할 사람을 고르십시오.\n");
-		scanf("%d", &who_invest);
+		//printf("조사할 사람을 고르십시오.\n");
+		msg_to_client_spe("조사할 사람을 고르십시오.\n", police);
+		//scanf("%d", &who_invest);
+		read_pol = read(user_sock[i], pol_chat, sizeof(pol_chat));
+		who_invest = atoi(pol_chat);
 		if (who_invest >= 0 && who_invest < num_user) {	//1~user수 사이의 수를 입력하지 않으면 다시 입력하게함.
 			if (user_roles[who_invest] == 0) {
-				printf("이미 죽은 사람입니다.");
+				//printf("이미 죽은 사람입니다.");
+				msg_to_client_spe("이미 죽은 사람입니다.\n", police);
 				who_invest = -1;
 			}
 			else
 				break;
 		}
 		else {
-			printf("잘못입력하였습니다.\n");
+			//printf("잘못입력하였습니다.\n");
+			msg_to_client_spe("잘못입력하였습니다.\n", police);
 			who_invest = -1;
 		}
 	}
 	current_role = 0;
 	if (user_roles[who_invest] == -1) {	//마피아가 맞는지 아닌지만 경찰에게 알려주는 부분
-		printf("player %d는 마피아가 맞습니다.\n", who_invest);
+		//printf("player %d는 마피아가 맞습니다.\n", who_invest);
+		msg_to_client_spe("player는 마피아가 맞습니다.\n", police);
 		return;
 	}
 	else {
-		printf("player %d는 마피아가 아닙니다.\n", who_invest);
+		//printf("player %d는 마피아가 아닙니다.\n", who_invest);
+		msg_to_client_spe("player는 마피아가 아닙니다.\n", police);
 		return;
 	}
 
@@ -183,24 +194,32 @@ void choice_invest() {			//마피아 알고리즘과 흡사합니다.
 }
 int choice_save() {	//마피아 알고리즘에서 변수 이름만 바뀌고 살릴 사람 리턴하는 함수
 	int who_save = -1;
+	int read_doc = 0;
 	current_role = 3;
 	print_now_users(doctor);
+
 	//fflush(stdin);
 	while (1) {
-		printf("살릴 사람을 고르십시오.\n");
-		scanf("%d", &who_save);
+		//printf("살릴 사람을 고르십시오.\n");
+		msg_to_client_spe("살릴 사람을 고르십시오.\n", doctor);
+		read_doc = read(user_sock[i], doc_chat, sizeof(doc_chat));
+		who_save = atoi(doc_chat);
+		//scanf("%d", &who_save);
 		if (who_save >= 0 && who_save < num_user) {	//1~user수 사이의 수를 입력하지 않으면 다시 입력하게함.
 			if (!user_roles[who_save]) {
-				printf("이미 죽은 사람입니다. 다시 고르세요");
+				//printf("이미 죽은 사람입니다. 다시 고르세요");
+				msg_to_client_spe("이미 죽은 사람입니다. 다시 고르세요\n", doctor);
 				who_save = -1;
 			}
 			else {
-				printf("%d번 플레이어를 살립니다.\n", who_save);
+				//printf("%d번 플레이어를 살립니다.\n", who_save);
+				msg_to_client_spe("플레이어를 살립니다.\n", doctor);
 				break;
 			}
 		}
 		else {
-			printf("잘못입력하였습니다.\n");
+			//printf("잘못입력하였습니다.\n");
+			msg_to_client_spe("잘못입력하였습니다.\n", doctor);
 			who_save = -1;
 		}
 	}
