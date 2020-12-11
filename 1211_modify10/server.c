@@ -9,6 +9,7 @@ void add_usr(int);
 void remove_usr(int);
 void* thread_server_write(void*);
 int check_victory();
+void msg_to_client(char* msg);
 
 int num_user = 0;	//참가자수
 int user_sock[8];	//최대 8명의 참가자
@@ -43,6 +44,7 @@ int vote_result() {
 	int i = 0;
 	int result = -1;
 	int most_num = -1;
+	char most_num_char[2];
 	for (i = 0; i < num_user; i++) {
 		if (vote_users[i] > most_num) {
 			most_num = vote_users[i];
@@ -59,6 +61,13 @@ int vote_result() {
 			break;
 		}
 	}
+	most_num_char[0] = most_num + 48;
+	most_num_char[1] = '\0';
+	msg_to_client(user_name[result]);
+	msg_to_client("has voted ");
+	msg_to_client(most_num_char);
+	msg_to_client("\n");
+
 	return result;
 }
 
@@ -99,7 +108,7 @@ void make_user_roles(int num_user) {
 	int map = 1;	//마피아와 경찰 의사는 기본 1명
 	int pol = 1;
 	int doc = 1;
-	//int civ = 0;
+	int civ = 0;
 	int map_count = 0;
 	int pol_count = 0, doc_count = 0;
 	int temp = 0;
@@ -143,8 +152,10 @@ void make_user_roles(int num_user) {
 		}
 	}
 	for (int i = 0; i < num_user; i++) {	//남은 인원들은 모두 시민
-		if (user_roles[i] == 0)
+		if (user_roles[i] == 0){
 			user_roles[i] = 1;
+			msg_to_client_spe("you are citizen\n", i);
+		}
 	}
 	num_civil = num_user - num_mafia;	//경찰 의사 포함한 시민의 수
 }
@@ -242,12 +253,14 @@ void choice_invest() {			//마피아 알고리즘과 흡사합니다.
 	current_role = 2;
 
 	print_now_users(police);
-
+	pol_chat[0] = '\0';
 	msg_to_client_spe("조사할 사람을 고르십시오.\n", police);
 	while (1) {
 		//printf("조사할 사람을 고르십시오.\n");
 		//scanf("%d", &who_invest);
 		read_pol = read(user_sock[police], pol_chat, sizeof(pol_chat));
+		if(pol_chat[strlen(pol_chat)-1] == '\n')
+			pol_chat[strlen(pol_chat)-1] = 0;
 		if(read_pol > 0){
 			who_invest = atoi(pol_chat) - 1;
 			
@@ -291,13 +304,15 @@ int choice_save() {	//마피아 알고리즘에서 변수 이름만 바뀌고 �
 	int read_doc = 0;
 	current_role = 3;
 	print_now_users(doctor);
-
+	doc_chat[0] = '\0';
 	//fflushstdin);
 	msg_to_client_spe("살릴 사람을 고르십시오.\n", doctor);
 	while (1) {
 		//printf("살릴 사람을 고르십시오.\n");
 		
 		read_doc = read(user_sock[doctor], doc_chat, sizeof(doc_chat));
+		if(doc_chat[strlen(doc_chat) - 1] == '\n')
+			doc_chat[strlen(doc_chat) - 1] = 0;
 		if(read_doc){
 			who_save = atoi(doc_chat) - 1;
 			//scanf("%d", &who_save);
@@ -390,7 +405,7 @@ void* thread_server_write(void* nul)	//thread function
 
 				my_chat[strlen(my_chat) - 1] = '\0';
 			
-			printf("%s\n", my_chat);
+			
 			
 			if (strcmp(my_chat, "/start") == 0)
 			{
@@ -417,8 +432,7 @@ void* thread_server_write(void* nul)	//thread function
 
 			else
 			{
-
-				printf("%s\n", my_chat);
+	
 				for (j = 0; j < num_user; j++)
 
 				{
@@ -467,19 +481,23 @@ void* game_chat(void* nul) {
                                                 write(user_sock[i], "서버에서 탈퇴처리 되었습니다.\n", BUFSIZ);
                                                 remove_usr(i);
                                         }
+					
+					if(chat[0] != '\n' && chat[1] != 0) //msg to all
+					{
 
-                                        for (j = 0; j < num_user; j++)
+                                        	for (j = 0; j < num_user; j++)
 
-                                        {
-                                                if (i != j)
-                                                {
-
-                                                        write(user_sock[j], user_name[i], strlen(user_name[i]));
-                                                        write(user_sock[j], ">", 2);
-                                                        write(user_sock[j], chat, read_cnt);
-                                                }
-                                        }
-                                        printf("%s>%s", user_name[i], chat);
+                                        	{
+                                                	if (i != j)
+                                                	{
+	
+        	                                                write(user_sock[j], user_name[i], strlen(user_name[i]));
+                	                                        write(user_sock[j], ">", 2);
+                        	                                write(user_sock[j], chat, read_cnt);
+                                	                }
+                                        	}
+                                       		printf("%s>%s", user_name[i], chat);
+					}
                                 }
 
                         }
@@ -501,18 +519,21 @@ void* game_chat(void* nul) {
 				else if (read_cnt > 0)//모든유저에게 메시지 발송
 				{
 					chat[read_cnt] = 0;
-
-					for (j = 0; j < num_user; j++)
-
+					
+					if(chat[0] != '\n' && chat[1] != 0)
 					{
-						if (i != j)
+						for (j = 0; j < num_user; j++)
+		
 						{
-							write(user_sock[j], user_name[i], strlen(user_name[i]));
-							write(user_sock[j], ">", 2);
-							write(user_sock[j], chat, read_cnt);
+							if (i != j)
+							{
+								write(user_sock[j], user_name[i], strlen(user_name[i]));
+								write(user_sock[j], ">", 2);
+								write(user_sock[j], chat, read_cnt);
+							}
 						}
+						printf("%s>%s", user_name[i], chat);
 					}
-					printf("%s>%s", user_name[i], chat);
 				}
 
 			}
@@ -557,14 +578,24 @@ void* game_chat(void* nul) {
 			
 			for (i = 0; i < num_user; i++)
 			{
+				
 				chat[0] = '\0';
 				if(user_roles[i] != 0)
 					read_cnt = read(user_sock[i], chat, sizeof(chat));
-				if (chat[0] == '/' && chat[1] == 'v' && chat[2] == 'o' && chat[3] == 't' && chat[4] == 'e') {
-					if (user_roles[chat[6] - 49] != 0)
+				if (chat[0] == '/' && chat[1] == 'v' && chat[2] == 'o' && chat[3] == 't' && chat[4] == 'e' && now_vote_users[i] == -1) {
+					if (user_roles[chat[6] - 49] != 0){
                                                 vote_users[chat[6] - 49]++;
-                                        else
+						now_vote_users[i] = 1;
+						msg_to_client(user_name[chat[6] - 49]);
+						msg_to_client("is voted\n");
+					}
+                                        else if(chat[6] == '-'){
+						abstention++;
+						now_vote_users[i] = 1;
+					}
+					else
                                                 msg_to_client_spe("이미 죽은 사람입니다. 다시 투표해주세요\n", i);
+					
 
 				}
 				else{
@@ -574,17 +605,22 @@ void* game_chat(void* nul) {
 					else if (read_cnt > 0)//모든유저에게 메시지 발송
 					{
 						chat[read_cnt] = 0;
-						for (j = 0; j < num_user; j++)
-						{
-							if (i != j)
-							{
-								write(user_sock[j], user_name[i], strlen(user_name[i]));
-								write(user_sock[j], ">", 2);
-								write(user_sock[j], chat, read_cnt);
 
+						if(chat[0] != '\n' && chat[1] != 0)
+						{
+
+							for (j = 0; j < num_user; j++)
+							{
+								if (i != j)
+								{
+									write(user_sock[j], user_name[i], strlen(user_name[i]));
+									write(user_sock[j], ">", 2);
+									write(user_sock[j], chat, read_cnt);
+	
+								}
 							}
+							printf("%s>%s", user_name[i], chat);
 						}
-						printf("%s>%s", user_name[i], chat);
 					}
 				}
 			}
@@ -638,7 +674,7 @@ void server(int portnum)
 			
 			/*1.낮이 되었습니다 파트*/
 
-			printf("mafia: %d civil: %d DAY\n", num_mafia, num_civil);
+			printf("mafia: %d civil: %d\n", num_mafia, num_civil);
 			cur_time = 120;
 			while (time_mode == DAY) {
 				sleep(1);
@@ -655,9 +691,10 @@ void server(int portnum)
 			for (i = 0; i < num_user; i++) {
 				print_now_users(i);
 			}
+			abstention = 0;
 			msg_to_client("**********VOTE TIME!!!**********\n");
 			msg_to_client("select maifia\n");
-	                msg_to_client("명령어 : \"/vote [유저번호]\"\n");
+	                msg_to_client("명령어 : \"/vote [유저번호]\", - is abstention\n");
 
 			while(time_mode == VOTE){
 				sleep(1);
@@ -709,21 +746,17 @@ int check_victory() {
 	int j;
 
 	if (num_mafia >= num_civil) { // 마피아와 시민 수가 같아지면 마피아 승리
-		for (j = 0; j < num_user; j++)
-		{
-			msg_to_client("마피아 승리!\n");
-			
-		}
+		
+		msg_to_client("마피아 승리!\n");
+
 		return -1;//게임 종료를 알림
 	}
 	if (num_mafia <= 0) {//마피아가 다 죽으면 시민 승리
-		for (j = 0; j < num_user; j++)
-		{
-			msg_to_client("시민 승리!\n");
-			
-		}
+		
+		msg_to_client("시민 승리!\n");
 		return -1;
 	}
+
 
 	return 10;
 }
