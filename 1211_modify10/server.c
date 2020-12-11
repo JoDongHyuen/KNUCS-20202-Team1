@@ -64,9 +64,9 @@ int vote_result() {
 	most_num_char[0] = most_num + 48;
 	most_num_char[1] = '\0';
 	msg_to_client(user_name[result]);
-	msg_to_client("has voted ");
+	msg_to_client("가 ");
 	msg_to_client(most_num_char);
-	msg_to_client("\n");
+	msg_to_client("표 받았습니다\n");
 
 	return result;
 }
@@ -128,7 +128,7 @@ void make_user_roles(int num_user) {
 		if (user_roles[temp] == 0) {
 			user_roles[temp] = -1;
 			mafia[map_count] = temp;
-			msg_to_client_spe("you are mafia\n", temp);
+			msg_to_client_spe("\n\n\t\t당신은 마피아입니다.\n\n", temp);
 			map_count++;
 			
 		}
@@ -140,21 +140,21 @@ void make_user_roles(int num_user) {
 		if (user_roles[temp] == 0 && pol_count == 0) {
 			user_roles[temp] = 2;
 			police = temp;
-			msg_to_client_spe("you are police\n", police);
+			msg_to_client_spe("\n\n\t\t당신은 경찰입니다.\n\n", police);
 			pol_count = 1;
 		}
 		temp = rand() % num_user;	//if문 안에 있던 오류 수정
 		if (user_roles[temp] == 0 && doc_count == 0) {
 			user_roles[temp] = 3;
 			doctor = temp;
-			msg_to_client_spe("you are doctor\n", doctor);
+			msg_to_client_spe("\n\n\t\t당신은 의사입니다.\n\n", doctor);
 			doc_count = 1;
 		}
 	}
 	for (int i = 0; i < num_user; i++) {	//남은 인원들은 모두 시민
 		if (user_roles[i] == 0){
 			user_roles[i] = 1;
-			msg_to_client_spe("you are citizen\n", i);
+			msg_to_client_spe("\n\n\t\t당신은 시민입니다.\n\n", i);
 		}
 	}
 	num_civil = num_user - num_mafia;	//경찰 의사 포함한 시민의 수
@@ -217,7 +217,7 @@ int choice_kill() {				//마피아가 밤에 행동하는 알고리즘
 					else
 					{
 						for (k = 0; k < num_mafia; k++)
-							msg_to_client_spe("잘못 입력셨습니다.\n", mafia[i]);
+							msg_to_client_spe("잘못 입력하셨습니다.\n", mafia[i]);
 						who_kill = -1;
 					}
 				}
@@ -587,7 +587,7 @@ void* game_chat(void* nul) {
                                                 vote_users[chat[6] - 49]++;
 						now_vote_users[i] = 1;
 						msg_to_client(user_name[chat[6] - 49]);
-						msg_to_client("is voted\n");
+						msg_to_client(" 1표\n");
 					}
                                         else if(chat[6] == '-'){
 						abstention++;
@@ -661,8 +661,8 @@ void server(int portnum)
 		{
 			/*0.직업 배정하는 파트*/
 			if (gameOn == 1) {	//시작하면 직업 배정해줌
-				msg_to_client("**********role distributing...**********\n");
-				printf("game start\n");
+				msg_to_client("게임을 시작합니다.\n");
+				msg_to_client("**********역할 분배중...**********\n");
 				make_user_roles(num_user);
 				gameOn = 10;
 				sleep(3);
@@ -670,11 +670,11 @@ void server(int portnum)
 			
 
 			//printf("%d", gameOn);
-			msg_to_client("************DAY... Let's talking about mafia..*************\n");
+			msg_to_client("************낮이 되었습니다.. 마피아를 찾아주세요*************\n");
 			
 			/*1.낮이 되었습니다 파트*/
 
-			printf("mafia: %d civil: %d\n", num_mafia, num_civil);
+			printf("현재 마피아 수: %d 현재 시민 수: %d\n", num_mafia, num_civil);
 			cur_time = 120;
 			while (time_mode == DAY) {
 				sleep(1);
@@ -693,8 +693,8 @@ void server(int portnum)
 			}
 			abstention = 0;
 			msg_to_client("**********VOTE TIME!!!**********\n");
-			msg_to_client("select maifia\n");
-	                msg_to_client("명령어 : \"/vote [유저번호]\", - is abstention\n");
+			msg_to_client("마피아를 지목해주세요\n");
+	                msg_to_client("명령어 : \"/vote [유저번호]\", 기권하시려면 /vote - 를 입력해주세요\n");
 
 			while(time_mode == VOTE){
 				sleep(1);
