@@ -7,7 +7,7 @@
 void add_usr(int);
 void remove_usr(int);
 void* thread_server_write(void*);
-
+int check_victory();
 
 int num_user = 0;	//참가자수
 int user_sock[8];	//최대 8명의 참가자
@@ -15,18 +15,20 @@ char user_name[8][BUFSIZ];	//참가자들의 닉네임
 int client_fd;
 int read_cnt;
 char chat[BUFSIZ];
-char mapia_chat[BUFSIZ], pol_chat[BUFSIZ], doc_chat[BUFSIZ];
+char mafia_chat[BUFSIZ], pol_chat[BUFSIZ], doc_chat[BUFSIZ];
 int sock_id = 0;
 /*			게임을 위해 추가한 변수			*/
 int gameOn = 0;		//게임 시작 여부
-int user_roles[8];	//유저의 역할
+int user_roles[8];	//유저의 역할 마피아 -1 죽은사람 0 시민 1 경찰 2 의사 3
 int vote_users[8] = { 0 };	//유저별 투표수 저장
-int abstention = 0;	//기권
+int now_vote_users[8] = { -1 }; //현재 투표를 했는지 체크
+int abstention = 0;	//기권, 가상의 vote_users[-1]이라고 생각한다.
 int time_mode = DAY;	//낮인지 밤인지 구분해주는 변수
 int current_role = 0;	//밤에 현재 역할이 누구냐를 구분하는 변수 마피아 -1 경찰 2 의사 3
-int police = -1, doctor = -1, mapia[3] = { -1 };//경찰, 의사, 마피아로 지목된 사람 저장
-int num_mapia = 0, num_civil = 0;
-//
+int police = -1, doctor = -1, mafia[3] = { -1 };//경찰, 의사, 마피아로 지목된 사람 저장
+int num_mafia = 0, num_civil = 0;
+/*			게임을 위해 추가한 변수			*/
+
 /*
 char* int_to_a(int i) {
 	char c[2];
@@ -35,6 +37,30 @@ char* int_to_a(int i) {
 	printf("return gogo");
 	return c;
 }*/
+
+int vote_result() {
+	int i = 0;
+	int result = -1;
+	int most_num = -1;
+	for (i = 0; i < num_user; i++) {
+		if (vote_users[i] > most_num) {
+			most_num = vote_users[i];
+			result = i;
+		}
+	}
+
+	if (abstention >= most_num)
+		return -1;
+
+	for (i = 0; i < num_user; i++) {
+		if (vote_users[i] == most_num && i != result) {
+			result = -1;
+			break;
+		}
+	}
+	return result;
+}
+
 void msg_to_client(char* msg) //메시지를 유저들에게 보냄
 {
 	int j;
@@ -53,12 +79,10 @@ void print_now_users(int who) {  //현재 생존자만 출력해주는 함수.
 	msg_to_client_spe("현재 생존자: ", who);
         for (i = 0; i < num_user; i++) { // 출력은 i+1로함
 			if (user_roles[i] != 0) {
-				printf("itoa\n");
 				char iplus[2];
-				iplus[0] = i + 48;
+				iplus[0] = i + 49;
 				iplus[1] = '\0';
 				msg_to_client_spe(iplus, who);	//i번째 플레이어
-				printf("int to a suc\n");
 				msg_to_client_spe(" ", who);
 				msg_to_client_spe(user_name[i], who);	//username을 프린트
 				msg_to_client_spe(" ", who);
@@ -86,14 +110,14 @@ void make_user_roles(int num_user) {
 	}
 
 	civ = num_user - (map + pol + doc);	//시민은 남은 인원
-	num_mapia = map;//마피아의 수
+	num_mafia = map;//마피아의 수
 	srand((unsigned int)time(NULL));	//랜덤으로 분배
 
 	while (map_count < map) {	//마피아 먼저 정하기
 		temp = rand() % num_user;
 		if (user_roles[temp] == 0) {
 			user_roles[temp] = -1;
-			mapia[map_count] = temp;
+			mafia[map_count] = temp;
 			map_count++;
 			
 		}
@@ -118,46 +142,48 @@ void make_user_roles(int num_user) {
 		if (user_roles[i] == 0)
 			user_roles[i] = 1;
 	}
-	num_civil = num_user - num_mapia;	//경찰 의사 포함한 시민의 수
+	num_civil = num_user - num_mafia;	//경찰 의사 포함한 시민의 수
 }
 
 /*--------------------------------night-----------------------------------*/
+
 int choice_kill() {				//마피아가 밤에 행동하는 알고리즘
+	
 	current_role = -1;
 	int who_kill = -1;
 	int read_kill = 0;
 	int i;
 	//fflush(stdin);
-	for (i = 0; i < num_mapia; i++)
-		print_now_users(mapia[i]);			//현재 남은 유저 프린트해주고 고르게하기
+	for (i = 0; i < num_mafia; i++)
+		print_now_users(mafia[i]);			//현재 남은 유저 프린트해주고 고르게하기
 
 	while (1) {
-		for (i = 0; i < num_mapia; i++)
-			msg_to_client_spe("죽일 사람을 고르십시오.\n", mapia[i]);
-		read_kill = read(user_sock[mapia[0]], mapia_chat, sizeof(mapia_chat));
+		for (i = 0; i < num_mafia; i++)
+			msg_to_client_spe("죽일 사람을 고르십시오.\n", mafia[i]);
+		read_kill = read(user_sock[mafia[0]], mafia_chat, sizeof(mafia_chat));
 		if(read_kill > 0){
-			who_kill = atoi(mapia_chat) - 1;
+			who_kill = atoi(mafia_chat) - 1;
 		
 			if (who_kill >= 0 && who_kill < num_user) {		//1~user수 사이의 수를 입력하지 않으면 다시 입력하게함.
 				if (!user_roles[who_kill]) {		//이미 죽은사람을 고르면 다시 고르게하기
-					for (i = 0; i < num_mapia; i++)
-						msg_to_client_spe("이미 죽은 사람입니다. 다시 고르세요\n", mapia[i]);
+					for (i = 0; i < num_mafia; i++)
+						msg_to_client_spe("이미 죽은 사람입니다. 다시 고르세요\n", mafia[i]);
 					who_kill = -1;
 				}
 				else {
 					//맞게 고르면 출력하고
-					for (i = 0; i < num_mapia; i++) {
-						msg_to_client_spe("플레이어", mapia[i]);
-						msg_to_client_spe(mapia_chat, mapia[i]);
-						msg_to_client_spe("플레이어를 죽입니다.\n", mapia[i]);
+					for (i = 0; i < num_mafia; i++) {
+						msg_to_client_spe("플레이어", mafia[i]);
+						msg_to_client_spe(mafia_chat, mafia[i]);
+						msg_to_client_spe("플레이어를 죽입니다.\n", mafia[i]);
 	
 					}
 					break;
 				}
 			}
 			else {
-				for (i = 0; i < num_mapia; i++)
-					msg_to_client_spe("잘못 고르셨습니다.\n", mapia[i]);
+				for (i = 0; i < num_mafia; i++)
+					msg_to_client_spe("잘못 고르셨습니다.\n", mafia[i]);
 				who_kill = -1;
 			}
 		}
@@ -166,14 +192,97 @@ int choice_kill() {				//마피아가 밤에 행동하는 알고리즘
 	return who_kill;		//죽일 유저 리턴
 
 }
+int choice_kill() {				//마피아가 밤에 행동하는 알고리즘
+
+	current_role = -1;
+
+	int who_kill = -1;
+	int read_map = 0;
+
+	int i, j, k;
+
+
+
+	for (i = 0; i < num_mafia; i++)
+
+		print_now_users(mafia[i]);			//현재 남은 유저 프린트해주고 고르게하기
+
+
+	for (i = 0; i < num_mafia; i++)
+	{
+
+		msg_to_client_spe("죽일 사람을 고르십시오.\n", mafia[i]);
+		msg_to_client_spe("명령어 : \"/kill [유저번호]\"\n", mafia[i]);
+	}
+
+
+	while (1) 	//마피아끼리 채팅처리
+	{
+		for (i = 0; i < num_mafia; i++)
+
+		{
+
+			read_map = read(user_sock[mafia[i]], mafia_chat, sizeof(mafia_chat));
+
+			if (read_map > 0)
+			{
+				mafia_chat[read_map] = 0;
+				if (mafia_chat[0] == '/' && mafia_chat[1] == 'k' && mafia_chat[2] == 'i' && mafia_chat[3] == 'l' && mafia_chat[4] == 'l')
+				{
+					who_kill = mafia_chat[6] - 49;
+					if (who_kill >= 0 && who_kill < num_user) {		//1~user수 사이의 수를 입력하지 않으면 다시 입력하게함.
+
+						if (!user_roles[who_kill]) {		//이미 죽은사람을 고르면 다시 고르게하기
+							for (k = 0; k < num_mafia; k++)
+								msg_to_client_spe("이미 죽은 사람입니다. 다시 고르세요\n", mafia[k]);
+							who_kill = -1;
+						}
+						else {//맞게 고르면 출력하고
+							for (k = 0; k < num_mafia; k++)
+								msg_to_client_spe("플레이어를 죽입니다.\n", mafia[k]);
+							break;
+						}
+					}
+					else
+					{
+						for (k = 0; k < num_mafia; k++)
+							msg_to_client_spe("잘못 입력셨습니다.\n", mafia[i]);
+						who_kill = -1;
+					}
+				}
+				else
+				{
+					for (j = 0; j < num_mafia; j++)
+					{
+
+						if (i != j)
+						{
+							write(user_sock[mafia[j]], user_name[mafia[i]], strlen(user_name[mafia[i]]));
+							write(user_sock[mafia[j]], ">", 2);
+							write(user_sock[mafia[j]], mafia_chat, read_map);
+						}
+					}
+				}
+			}
+		}
+
+	}
+
+	current_role = 0;
+
+	return who_kill;		//죽일 유저 리턴
+
+
+
+}
 void choice_invest() {			//마피아 알고리즘과 흡사합니다.
 	
 	int who_invest = -1;
 	int read_pol = 0;
 	current_role = 2;
-	printf("print\n");
+
 	print_now_users(police);
-	printf("while\n");
+
 	msg_to_client_spe("조사할 사람을 고르십시오.\n", police);
 	while (1) {
 		//printf("조사할 사람을 고르십시오.\n");
@@ -224,7 +333,7 @@ int choice_save() {	//마피아 알고리즘에서 변수 이름만 바뀌고 �
 	print_now_users(doctor);
 
 	//fflushstdin);
-	msg_to_client_spe("sallil 사람을 고르십시오.\n", doctor);
+	msg_to_client_spe("살릴 사람을 고르십시오.\n", doctor);
 	while (1) {
 		//printf("살릴 사람을 고르십시오.\n");
 		
@@ -263,9 +372,15 @@ void night() {
 	int who_kill = -1, who_save = -1;
 	int j;
 	int sleep_pol = 3, sleep_doc = 3;
+
+
+	srand((unsigned int)time(NULL)); //경찰이랑 의사가 죽었을 때 랜덤으로 sleep을 걸어줘서 죽었는지 살았는지 구분하기 힘들게 함.
+
+	sleep_pol = rand() % 3 + 4;
+	sleep_doc = rand() % 3 + 4;
+
 	//밤이되었음을 알림
 	msg_to_client("밤이 되었습니다.\n");
-	printf("%d %d", police, doctor);
 	if (user_roles[police] != 0)	//경찰이 살아있으면 실행
 		choice_invest();	//조사 시작
 	else
@@ -285,7 +400,7 @@ void night() {
 	}
 	else {	//다르면 죽임
 		if(user_roles[who_kill] == -1)
-			num_mapia--;//마피아를 죽였으면 마피아 수 감소
+			num_mafia--;//마피아를 죽였으면 마피아 수 감소
 		else
 			num_civil--;//시민을 죽였으면 시민 수 감소
 		
@@ -328,12 +443,15 @@ void* thread_server_write(void* nul)	//thread function
 
 
 			else if (strcmp(my_chat, "/vote") == 0) //시간넘어가는거 SIGALRM이든 자동으로 변경예정
-
 				time_mode = VOTE;
-
+			else if (strcmp(my_chat, "/night") == 0) //시간넘어가는거 SIGALRM이든 자동으로 변경예정
+				time_mode = NIGHT;
 			else if (strcmp(my_chat, "/help") == 0) //명령어 목록 보여줌, 명령어 추가하면 여기도 추가해야함
 			{
+				printf("※※※※※※※ 진행자는 장난을 치면 절 대 안 됩 니 다 ※※※※※※※ \n");
 				printf("""/start"" : 게임을 시작합니다.(4~8명의 유저필요함)\n");
+				printf("""/vote"" : 낮을 스킵하고 투표로 바로 넘어갑니다.\n");
+				printf("""/night"" : 낮을 스킵하고 밤으로 바로 넘어갑니다.\n");
 			}
 
 			else
@@ -369,13 +487,12 @@ void* game_chat(void* nul) {
 
 			for (i = 0; i < num_user; i++)
 			{
-				read_cnt = read(user_sock[i], chat, sizeof(chat));
+				if(user_roles[i] != 0)
+					read_cnt = read(user_sock[i], chat, sizeof(chat));
 
 				if (read_cnt == 0)//유저채팅탈퇴 처리
 					remove_usr(i);
 
-
-				/*else if(exit 입력시 유저탈퇴처리)추가*/
 
 				else if (read_cnt > 0)//모든유저에게 메시지 발송
 				{
@@ -406,7 +523,11 @@ void* game_chat(void* nul) {
 		else if (time_mode == NIGHT) {
 			for (i = 0; i < num_user; i++)
 			{
-				read_cnt = read(user_sock[i], chat, sizeof(chat));
+				
+
+				
+				if(user_roles[i] != current_role && user_roles[i] != 0)
+					read_cnt = read(user_sock[i], chat, sizeof(chat));
 
 				if (read_cnt == 0)//유저채팅탈퇴 처리
 					remove_usr(i);
@@ -419,7 +540,7 @@ void* game_chat(void* nul) {
 					{
 						if (i != j)
 						{
-							if ((j == mapia[0] || j == mapia[1] || j == mapia[2]) && (i == mapia[0] || i == mapia[1] || i == mapia[2])) {
+							if ((j == mafia[0] || j == mafia[1] || j == mafia[2]) && (i == mafia[0] || i == mafia[1] || i == mafia[2])) {
 								write(user_sock[j], user_name[i], strlen(user_name[i]));
 								write(user_sock[j], ">", 2);
 								write(user_sock[j], chat, read_cnt);
@@ -429,16 +550,19 @@ void* game_chat(void* nul) {
 					}*/
 					printf("%s>%s", user_name[i], chat);
 				}
+				
+
+
 
 			}
 		}
 		else if (time_mode == VOTE) { // 투표시간이 되면 투표만할수있게함
-			for (i = 0; i < num_user; i++)
-				vote_users[i] = 0;
+			
 			for (i = 0; i < num_user; i++)
 			{
-				read_cnt = read(user_sock[i], chat, sizeof(chat));
-				if (strstr(chat, "\vote") == NULL) {
+				if(user_roles[i] != 0)
+					read_cnt = read(user_sock[i], chat, sizeof(chat));
+				if (strstr(chat, "/vote") == NULL) {
 					if (read_cnt == 0)//유저채팅탈퇴 처리
 						remove_usr(i);
 					/*else if(exit 입력시 유저탈퇴처리)추가*/
@@ -449,7 +573,6 @@ void* game_chat(void* nul) {
 						{
 							if (i != j)
 							{
-
 								write(user_sock[j], user_name[i], strlen(user_name[i]));
 								write(user_sock[j], ">", 2);
 								write(user_sock[j], chat, read_cnt);
@@ -460,7 +583,10 @@ void* game_chat(void* nul) {
 					}
 				}
 				else {
-					//vote_users[atoi(chat[6])]++;
+					if (user_roles[chat[6] - 49] != 0)
+						vote_users[chat[6] - 49]++;
+					else
+						msg_to_client_spe("이미 죽은 사람입니다. 다시 투표해주세요\n", i);
 				}
 
 			}
@@ -478,6 +604,7 @@ void server(int portnum)
 	pthread_t t2;
 	int i, j;
 	int sum = 0;
+	int cur_time = 120;
 	sock_id = make_server_socket(portnum);
 	if (sock_id == 0) exit(1);
 	msg_to_client("\n\n**게임서버에 접속되었습니다.**\n");
@@ -492,8 +619,8 @@ void server(int portnum)
 	//게임에 이용되는 채팅을 쓰레드로 수행함.
 	pthread_create(&t2, NULL, game_chat, (void*)NULL);
 	while (1) {
-		sleep(2);
-		printf("gameOn: %d\n", gameOn);
+		sleep(1);
+		//printf("gameOn: %d\n", gameOn);
 		while (gameOn)// if (게임이 시작 되었을 때)
 		{
 			/*0.직업 배정하는 파트*/
@@ -508,63 +635,86 @@ void server(int portnum)
 			sleep(2);
 
 			/*1.낮이 되었습니다 파트*/
+			printf("mafia: %d civil: %d DAY\n", num_mafia, num_civil);
+			cur_time = 120
 			while (time_mode == DAY) {
-
-				printf("mapia: %d civil: %d DAY\n", num_mapia, num_civil);
-				sleep(2);
+				sleep(1);
+				cur_time--;
+				if (cur_time < 0)
+					break;
 			}
 			/*2.투표 파트*/
 			time_mode = VOTE;
+			for (i = 0; i < num_user; i++) {
+				vote_users[i] = 0;
+				now_vote_users[i] = -1;
+			}
+			for (i = 0; i < num_uses; i++) {
+				print_now_users(i);
+			}
 			while(time_mode == VOTE){
-				printf("VOTE\n");
-				sleep(2);
-				/*sum = 0;
+				printf("VOTE time\n");
+				sleep(1);
+				sum = 0;
 				for (i = 0; i < num_user; i++) {
 					if (user_roles[i] != 0) {
 						sum += vote_users[i];
 					}
 				}
-				if (sum == num_mapia + num_civil)*/
+				if (sum >= num_mafia + num_civil) {
+					int rst = -1; // 투표 결과를 저장
+					char rst_string[2];
+					rst = vote_result();
+					rst_string[0] = rst + 49;
+					rst_string[1] = '\0';
+					if (rst != -1) {
+						user_roles[rst] = 0;
+						msg_to_client("투표 결과 ");
+						msg_to_client(rst_string);
+						msg_to_client("번 플레이어가 죽었습니다.\n");
+					}
 					time_mode = NIGHT;
+				}
 			}
+			gameOn = check_victory();
+			if (gameOn == -1)
+				break;
 			/*3.밤이 되었습니다 직업별로 사람 선택*/
 			if(time_mode == NIGHT)
 				night();
-			
 			/*다시 낮이 되었습니다 루프 -> 이 부분은 while문 돌면서 1번으로 돌아가는 부분이라 추가할 필요 없을듯 + game_chat부분에서 낮으로 돌아감*/
-
 			/*4.승리 조건 만족하면 루프 탈출*/
-			if (num_mapia >= num_civil) { // 마피아와 시민 수가 같아지면 마피아 승리
-				for (j = 0; j < num_user; j++)
-				{
-					if (i != j)
-					{
-						printf("마피아 승리!");
-						write(user_sock[j], "마피아 승리!", 13);
-					}
-				}
-				gameOn = -1;//게임 종료를 알림
+			gameOn = check_victory();
+			if (gameOn == -1)
 				break;
-			}
-			if (num_mapia <= 0) {//마피아가 다 죽으면 시민 승리
-				for (j = 0; j < num_user; j++)
-				{
-					if (i != j)
-					{
-						printf("시민 승리!");
-						write(user_sock[j], "시민 승리!", 11);
-					}
-				}
-				gameOn = -1;
-				break;
-			}
 		}
 		if (gameOn == -1)
 			break;
 	}
 
 }
+int check_victory() {
+	int j;
 
+	if (num_mafia >= num_civil) { // 마피아와 시민 수가 같아지면 마피아 승리
+		for (j = 0; j < num_user; j++)
+		{
+			msg_to_client("마피아 승리!\n")
+			
+		}
+		return -1;//게임 종료를 알림
+	}
+	if (num_mafia <= 0) {//마피아가 다 죽으면 시민 승리
+		for (j = 0; j < num_user; j++)
+		{
+			msg_to_client("시민 승리!\n")
+			
+		}
+		return -1;
+	}
+
+	return 10;
+}
 void add_usr(int s)
 {
 	int read_cnt = 0;
